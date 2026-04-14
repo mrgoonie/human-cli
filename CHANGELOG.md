@@ -1,3 +1,15 @@
+## [2.0.0](https://github.com/mrgoonie/human-cli/compare/v1.1.0...v2.0.0) (2026-04-14)
+
+### ⚠ BREAKING CHANGES
+
+* v1.1.0 already shipped the MCP-subprocess removal; this
+commit retroactively bumps the version to v2.0.0 to reflect the contract
+break. No API or behaviour change vs v1.1.0.
+
+### Bug Fixes
+
+* CI typecheck + breaking-change bump rule ([d0ca059](https://github.com/mrgoonie/human-cli/commit/d0ca059daae1c53f56b6940682f3f8ad0b5d5754))
+
 ## [1.1.0](https://github.com/mrgoonie/human-cli/compare/v1.0.0...v1.1.0) (2026-04-14)
 
 ### ⚠ BREAKING CHANGES
