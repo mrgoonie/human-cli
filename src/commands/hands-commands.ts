@@ -19,6 +19,18 @@ import {
   rotateImage,
   maskImage
 } from "../processors/hands/jimp-ops.js";
+import { generateVideo } from "../processors/hands/gen-video.js";
+import {
+  generateMinimaxMusic,
+  generateElevenLabsSfx,
+  generateElevenLabsMusic
+} from "../processors/hands/gen-audio.js";
+import { removeBackground } from "../processors/hands/remove-background.js";
+import {
+  captureFullPage,
+  captureViewport,
+  captureElement
+} from "../processors/hands/screenshot.js";
 import { loadMedia } from "../core/media-loader.js";
 
 export function registerHandsCommands(program: Command): void {
@@ -236,27 +248,222 @@ export function registerHandsCommands(program: Command): void {
       });
     });
 
-  // ----- Deferred to v2.1 -----
-  for (const { name, hint } of [
-    { name: "gen-video", hint: "Veo video generation" },
-    { name: "img-to-video", hint: "Image-to-video animation" },
-    { name: "gen-music", hint: "Minimax music generation" },
-    { name: "gen-sfx", hint: "ElevenLabs sound effects" },
-    { name: "gen-music-el", hint: "ElevenLabs music" },
-    { name: "remove-bg", hint: "AI background removal (rmbg + onnxruntime)" },
-    { name: "screenshot", hint: "Playwright web screenshots" }
-  ]) {
-    hands
-      .command(`${name} [args...]`)
-      .description(`${hint} — native port deferred to v2.1`)
-      .allowUnknownOption()
-      .action(() => {
-        process.stderr.write(
-          `✗ 'human hands ${name}' is not yet native in v2.0.\n` +
-            `   Deferred to v2.1 (${hint}).\n` +
-            `   Workaround: install @goonnguyen/human-mcp and run 'human call <mcp_tool>' directly.\n`
-        );
-        process.exit(4);
+  // ----- Video generation (Minimax Hailuo) -----
+  hands
+    .command("gen-video <prompt>")
+    .alias("video")
+    .description("Generate a video from text (Minimax Hailuo 2.3; Gemini Veo in v2.2)")
+    .option("--provider <p>", "minimax", "minimax")
+    .option("--model <id>", "MiniMax-Hailuo-2.3 | MiniMax-Hailuo-2.3-Fast")
+    .option("--duration <sec>", "Video duration in seconds", Number, 6)
+    .option("--resolution <r>", "768P | 1080P", "1080P")
+    .option("--image <src>", "First-frame image (for image-to-video)")
+    .option("--no-optimize", "Disable prompt optimization")
+    .action(async (prompt: string, opts, cmd) => {
+      await runProcessor({
+        tool: "hands.gen-video",
+        globals: extractGlobalFlags(cmd),
+        run: (config) =>
+          generateVideo(config, {
+            prompt,
+            provider: opts.provider,
+            model: opts.model,
+            duration: opts.duration,
+            resolution: opts.resolution,
+            firstFrameImage: opts.image,
+            promptOptimizer: opts.optimize !== false
+          }),
+        toOutput: (r) => ({
+          text: `Video ${r.metadata.width}×${r.metadata.height}, ${r.metadata.duration}s, model ${r.metadata.model}`,
+          media: [{ kind: "video", mimeType: r.mimeType, base64: r.videoBase64 }]
+        })
       });
+    });
+
+  hands
+    .command("img-to-video <image>")
+    .description("Animate a still image (Minimax Hailuo I2V)")
+    .option("-p, --prompt <text>", "Motion description", "")
+    .option("--model <id>", "MiniMax-Hailuo-2.3 | MiniMax-Hailuo-2.3-Fast", "MiniMax-Hailuo-2.3-Fast")
+    .option("--duration <sec>", "Video duration in seconds", Number, 6)
+    .option("--resolution <r>", "768P | 1080P", "1080P")
+    .action(async (image: string, opts, cmd) => {
+      await runProcessor({
+        tool: "hands.img-to-video",
+        globals: extractGlobalFlags(cmd),
+        run: (config) =>
+          generateVideo(config, {
+            prompt: opts.prompt || "animate this image",
+            model: opts.model,
+            duration: opts.duration,
+            resolution: opts.resolution,
+            firstFrameImage: image
+          }),
+        toOutput: (r) => ({
+          text: `Video ${r.metadata.width}×${r.metadata.height}, ${r.metadata.duration}s`,
+          media: [{ kind: "video", mimeType: r.mimeType, base64: r.videoBase64 }]
+        })
+      });
+    });
+
+  // ----- Music & SFX -----
+  hands
+    .command("gen-music <lyrics>")
+    .description("Generate music with vocals (Minimax Music 2.5). '-' or @file supported.")
+    .option("-p, --prompt <text>", "Style / genre prompt")
+    .option("--format <fmt>", "mp3 | wav", "mp3")
+    .option("--sample-rate <n>", "Sample rate", Number, 44100)
+    .option("--bitrate <n>", "Bitrate (bps)", Number, 256000)
+    .action(async (lyrics: string, opts, cmd) => {
+      await runProcessor({
+        tool: "hands.gen-music",
+        globals: extractGlobalFlags(cmd),
+        run: (config) =>
+          generateMinimaxMusic(config, {
+            lyrics: materializeText(lyrics),
+            prompt: opts.prompt,
+            audioFormat: opts.format,
+            sampleRate: opts.sampleRate,
+            bitrate: opts.bitrate
+          }),
+        toOutput: (r) => ({
+          text: `Music: model ${r.metadata.model}, format ${r.metadata.format}${r.metadata.duration_seconds ? `, ${r.metadata.duration_seconds}s` : ""}`,
+          media: [{ kind: "audio", mimeType: r.mimeType, base64: r.audioBase64 }]
+        })
+      });
+    });
+
+  hands
+    .command("gen-sfx <description>")
+    .description("Generate sound effects (ElevenLabs, paid plan required)")
+    .option("--duration <sec>", "Duration in seconds", Number)
+    .option("--loop", "Make the SFX loopable", false)
+    .option("--prompt-influence <n>", "Prompt influence 0-1", Number)
+    .action(async (description: string, opts, cmd) => {
+      await runProcessor({
+        tool: "hands.gen-sfx",
+        globals: extractGlobalFlags(cmd),
+        run: (config) =>
+          generateElevenLabsSfx(config, {
+            text: description,
+            duration_seconds: opts.duration,
+            loop: opts.loop,
+            prompt_influence: opts.promptInfluence
+          }),
+        toOutput: (r) => ({
+          text: `SFX: model ${r.metadata.model}${r.metadata.duration_seconds ? `, ${r.metadata.duration_seconds}s` : ""}`,
+          media: [{ kind: "audio", mimeType: r.mimeType, base64: r.audioBase64 }]
+        })
+      });
+    });
+
+  hands
+    .command("gen-music-el <prompt>")
+    .description("Generate music tracks (ElevenLabs Music, 3s-10min, paid plan)")
+    .option("--length <ms>", "Duration in ms (3000-600000)", Number, 30000)
+    .option("--instrumental", "Force instrumental", false)
+    .action(async (prompt: string, opts, cmd) => {
+      await runProcessor({
+        tool: "hands.gen-music-el",
+        globals: extractGlobalFlags(cmd),
+        run: (config) =>
+          generateElevenLabsMusic(config, {
+            prompt,
+            music_length_ms: opts.length,
+            force_instrumental: opts.instrumental
+          }),
+        toOutput: (r) => ({
+          text: `Music: ${r.metadata.duration_seconds}s, model ${r.metadata.model}`,
+          media: [{ kind: "audio", mimeType: r.mimeType, base64: r.audioBase64 }]
+        })
+      });
+    });
+
+  // ----- Background removal (optional: rmbg + onnxruntime) -----
+  hands
+    .command("remove-bg <input>")
+    .description("Remove background from an image (rmbg local AI)")
+    .option("--quality <level>", "fast | balanced | high", "balanced")
+    .option("--format <fmt>", "png | jpeg", "png")
+    .option("--background <color>", "Background color for JPEG (e.g. #ffffff)")
+    .option("--jpeg-quality <n>", "JPEG quality 1-100", Number, 85)
+    .action(async (input: string, opts, cmd) => {
+      await runProcessor({
+        tool: "hands.remove-bg",
+        globals: extractGlobalFlags(cmd),
+        run: (config) =>
+          removeBackground(config, {
+            inputImage: input,
+            quality: opts.quality,
+            outputFormat: opts.format,
+            backgroundColor: opts.background,
+            jpegQuality: opts.jpegQuality
+          }),
+        toOutput: (r) => ({
+          text: `BG removed from ${r.originalDimensions.width}×${r.originalDimensions.height}, quality=${r.quality}`,
+          media: [{ kind: "image", mimeType: r.mimeType, base64: r.base64 }]
+        })
+      });
+    });
+
+  // ----- Playwright screenshots (optional) -----
+  hands
+    .command("screenshot <url>")
+    .description("Capture a webpage screenshot (requires optional `playwright`)")
+    .option("-m, --mode <mode>", "fullpage | viewport | element", "fullpage")
+    .option("-s, --selector <q>", "Element selector (for --mode element)")
+    .option("--selector-type <t>", "css | text | role", "css")
+    .option("--format <fmt>", "png | jpeg", "png")
+    .option("--quality <n>", "JPEG quality", Number)
+    .option("--viewport-width <n>", "Viewport width", Number)
+    .option("--viewport-height <n>", "Viewport height", Number)
+    .option("--wait-until <m>", "load | domcontentloaded | networkidle", "load")
+    .action(async (url: string, opts, cmd) => {
+      await runProcessor({
+        tool: `hands.screenshot.${opts.mode}`,
+        globals: extractGlobalFlags(cmd),
+        run: async () => {
+          const base = {
+            url,
+            format: opts.format,
+            quality: opts.quality,
+            viewportWidth: opts.viewportWidth,
+            viewportHeight: opts.viewportHeight,
+            waitUntil: opts.waitUntil
+          };
+          if (opts.mode === "viewport") return captureViewport(base);
+          if (opts.mode === "element") {
+            if (!opts.selector) throw new Error("--selector is required for --mode element");
+            return captureElement({
+              ...base,
+              selector: opts.selector,
+              selectorType: opts.selectorType
+            });
+          }
+          return captureFullPage(base);
+        },
+        toOutput: (r) => ({
+          text: `Screenshot of ${r.url} (${r.viewport.width}×${r.viewport.height})`,
+          media: [{ kind: "image", mimeType: r.mimeType, base64: r.base64 }]
+        })
+      });
+    });
+}
+
+function materializeText(input: string): string {
+  if (input === "-") {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      return require("node:fs").readFileSync(0, "utf8") as string;
+    } catch {
+      return "";
+    }
   }
+  if (input.startsWith("@")) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const fs = require("node:fs") as typeof import("node:fs");
+    const path = input.slice(1);
+    if (fs.existsSync(path)) return fs.readFileSync(path, "utf8");
+  }
+  return input;
 }

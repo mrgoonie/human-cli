@@ -7,6 +7,10 @@ import { readFileSync, existsSync } from "node:fs";
 import { runProcessor } from "../runtime/run-processor.js";
 import { extractGlobalFlags } from "../runtime/global-flags.js";
 import { speak, narrate } from "../processors/mouth/speak.js";
+import {
+  explainCode,
+  customizeVoice
+} from "../processors/mouth/explain-and-customize.js";
 
 export function registerMouthCommands(program: Command): void {
   const mouth = program.command("mouth").description("Text-to-speech: speak & narrate");
@@ -63,22 +67,71 @@ export function registerMouthCommands(program: Command): void {
       });
     });
 
-  // Deferred: explain, customize — v2.1 stretch
-  for (const { name, hint } of [
-    { name: "explain", hint: "Code-to-speech with syntax awareness" },
-    { name: "customize", hint: "Voice comparison & style tuning" }
-  ]) {
-    mouth
-      .command(`${name} [args...]`)
-      .description(`${hint} — native port deferred to v2.1`)
-      .allowUnknownOption()
-      .action(() => {
-        process.stderr.write(
-          `✗ 'human mouth ${name}' is not yet native in v2.0 (deferred to v2.1).\n`
-        );
-        process.exit(4);
+  mouth
+    .command("explain <code>")
+    .description("Generate a spoken explanation of code. '-' / @file supported.")
+    .option("--voice <name>", "Voice (default: Apollo)")
+    .option("--language <lang>", "Spoken language", "en-US")
+    .option("--programming-lang <lang>", "Programming language of the code")
+    .option("--level <lvl>", "beginner | intermediate | advanced", "intermediate")
+    .option("--no-examples", "Skip inline usage examples")
+    .action(async (code: string, opts, cmd) => {
+      await runProcessor({
+        tool: "mouth.explain",
+        globals: extractGlobalFlags(cmd),
+        run: (config) =>
+          explainCode(config, {
+            code: materializeText(code),
+            voice: opts.voice,
+            language: opts.language,
+            programmingLanguage: opts.programmingLang,
+            explanationLevel: opts.level,
+            includeExamples: opts.examples !== false
+          }),
+        toOutput: (r) => ({
+          text: `Explanation (${r.metadata.voice}, ${r.metadata.language}):\n\n${r.explanation}`,
+          media: [{ kind: "audio", mimeType: r.mimeType, base64: r.audioBase64 }]
+        })
       });
-  }
+    });
+
+  mouth
+    .command("customize <text>")
+    .description("Test & compare voice + style combinations")
+    .option("--voice <name>", "Primary voice")
+    .option("--language <lang>", "Language", "en-US")
+    .option("--compare <names>", "Comma-separated voices to compare")
+    .option("--variations <list>", "Comma-separated style prompts")
+    .action(async (text: string, opts, cmd) => {
+      await runProcessor({
+        tool: "mouth.customize",
+        globals: extractGlobalFlags(cmd),
+        run: (config) =>
+          customizeVoice(config, {
+            text: materializeText(text),
+            voice: opts.voice,
+            language: opts.language,
+            compareVoices: opts.compare ? String(opts.compare).split(",").map((s) => s.trim()) : undefined,
+            styleVariations: opts.variations ? String(opts.variations).split(",").map((s) => s.trim()) : undefined
+          }),
+        toOutput: (r) => {
+          const summary = r.variants
+            .map(
+              (v, i) =>
+                `${i + 1}. voice=${v.voice}${v.stylePrompt ? ` style="${v.stylePrompt}"` : ""} (${v.processing_time_ms}ms)`
+            )
+            .join("\n");
+          return {
+            text: `Customize — ${r.totalVariants} variant(s):\n${summary}`,
+            media: r.variants.map((v) => ({
+              kind: "audio" as const,
+              mimeType: v.mimeType,
+              base64: v.audioBase64
+            }))
+          };
+        }
+      });
+    });
 }
 
 function materializeText(input: string): string {

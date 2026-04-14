@@ -22,5 +22,20 @@ export { readDocument, summarizeDocument } from "./processors/eyes/read-document
 export { generateImage, editImageWithGemini } from "./processors/hands/gen-image.js";
 export { cropImage, resizeImage, rotateImage, maskImage } from "./processors/hands/jimp-ops.js";
 export { speak, narrate } from "./processors/mouth/speak.js";
+export { explainCode, customizeVoice } from "./processors/mouth/explain-and-customize.js";
 export { think, reflect, analyzeSimple, patternsInfo } from "./processors/brain/think.js";
+export { generateVideo } from "./processors/hands/gen-video.js";
+export {
+  generateMinimaxMusic,
+  generateElevenLabsSfx,
+  generateElevenLabsMusic
+} from "./processors/hands/gen-audio.js";
+export { removeBackground } from "./processors/hands/remove-background.js";
+export {
+  captureFullPage,
+  captureViewport,
+  captureElement
+} from "./processors/hands/screenshot.js";
+export { MinimaxClient, MinimaxApiError } from "./core/providers/minimax-client.js";
+export { ElevenLabsClient, ElevenLabsApiError } from "./core/providers/elevenlabs-client.js";
 export { version } from "./version.js";

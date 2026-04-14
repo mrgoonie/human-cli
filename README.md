@@ -215,14 +215,27 @@ cat payload.json | human call mouth_speak --args - --json -o -
 
 human-cli ships its own native MCP server (`human mcp start`). Requires the `@modelcontextprotocol/sdk` optional dep (auto-installed).
 
-## What's new in v2.0
+## What's new in v2.1
 
-Breaking rewrite. Everything native:
+Heavy-media processors land natively (previously stubbed with exit 4):
+- ✅ `hands gen-video` / `img-to-video` — Minimax Hailuo 2.3 (submit → poll → download)
+- ✅ `hands gen-music` — Minimax Music 2.5
+- ✅ `hands gen-sfx` — ElevenLabs Sound Effects
+- ✅ `hands gen-music-el` — ElevenLabs Music
+- ✅ `hands remove-bg` — rmbg local AI (fast/balanced/high quality)
+- ✅ `hands screenshot` — Playwright (fullpage, viewport, element)
+- ✅ `mouth explain` — code → speech via Gemini
+- ✅ `mouth customize` — voice + style comparison matrix
+- 📦 Tool registry grew **16 → 26**
+- ⏳ Deferred to v2.2: real Gemini Veo, ZhipuAI provider routes, DOCX/XLSX/PPTX parsers, Minimax/ElevenLabs TTS in `mouth speak`
+
+## What changed in v2.0
+
+Breaking rewrite — everything native:
 - ❌ Removed: MCP subprocess spawn via `@goonnguyen/human-mcp`
 - ✅ Added: native processors (`src/processors/*`) with direct Gemini SDK calls
 - ✅ Added: internal tool registry (`src/mcp/tool-registry.ts`) exposed via `call`/`tools`/`mcp start`
 - ✅ Added: native MCP stdio server (`src/mcp/server.ts`) for Claude Desktop compatibility
-- ⏳ Deferred to v2.1: video generation (Veo polling), music/SFX (Minimax/ElevenLabs), playwright screenshots, rmbg background removal, DOCX/XLSX/PPTX parsers, `mouth explain`/`customize`
 
 ## Development
 

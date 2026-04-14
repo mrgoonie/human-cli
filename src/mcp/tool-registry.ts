@@ -12,7 +12,20 @@ import { readDocument, summarizeDocument } from "../processors/eyes/read-documen
 import { generateImage, editImageWithGemini } from "../processors/hands/gen-image.js";
 import { cropImage, resizeImage, rotateImage, maskImage } from "../processors/hands/jimp-ops.js";
 import { speak, narrate } from "../processors/mouth/speak.js";
+import { explainCode, customizeVoice } from "../processors/mouth/explain-and-customize.js";
 import { think, reflect, analyzeSimple, patternsInfo } from "../processors/brain/think.js";
+import { generateVideo } from "../processors/hands/gen-video.js";
+import {
+  generateMinimaxMusic,
+  generateElevenLabsSfx,
+  generateElevenLabsMusic
+} from "../processors/hands/gen-audio.js";
+import { removeBackground } from "../processors/hands/remove-background.js";
+import {
+  captureFullPage,
+  captureViewport,
+  captureElement
+} from "../processors/hands/screenshot.js";
 
 export interface ToolCallResult {
   text: string;
@@ -32,6 +45,9 @@ const imageMedia = (data: string, mime: string): ToolCallResult["media"] => [
 ];
 const audioMedia = (data: string, mime: string): ToolCallResult["media"] => [
   { kind: "audio", mimeType: mime, base64: data }
+];
+const videoMedia = (data: string, mime: string): ToolCallResult["media"] => [
+  { kind: "video", mimeType: mime, base64: data }
 ];
 
 export const TOOL_REGISTRY: ToolSpec[] = [
@@ -310,6 +326,214 @@ export const TOOL_REGISTRY: ToolSpec[] = [
           "# Reasoning Patterns\n\n" +
           r.patterns.map((p) => `- **${p.name}** — ${p.purpose}`).join("\n"),
         media: []
+      };
+    }
+  },
+  {
+    name: "hands_gen_video",
+    description: "Generate a video from text (Minimax Hailuo 2.3)",
+    inputSchema: {
+      prompt: { type: "string", required: true },
+      duration: { type: "number", description: "seconds (default 6)" },
+      resolution: { type: "string", description: "768P | 1080P" },
+      first_frame_image: { type: "string", description: "image for I2V" },
+      model: { type: "string" }
+    },
+    run: async (config, args) => {
+      const r = await generateVideo(config, {
+        prompt: String(args.prompt),
+        duration: args.duration !== undefined ? Number(args.duration) : undefined,
+        resolution: args.resolution as "768P" | "1080P" | undefined,
+        firstFrameImage: args.first_frame_image ? String(args.first_frame_image) : undefined,
+        model: args.model as "MiniMax-Hailuo-2.3" | undefined
+      });
+      return {
+        text: `Video ${r.metadata.width}×${r.metadata.height}, ${r.metadata.duration}s`,
+        media: videoMedia(r.videoBase64, r.mimeType)
+      };
+    }
+  },
+  {
+    name: "hands_gen_music",
+    description: "Generate music with vocals (Minimax Music 2.5)",
+    inputSchema: {
+      lyrics: { type: "string", required: true },
+      prompt: { type: "string" },
+      format: { type: "string", description: "mp3 | wav" }
+    },
+    run: async (config, args) => {
+      const r = await generateMinimaxMusic(config, {
+        lyrics: String(args.lyrics),
+        prompt: args.prompt ? String(args.prompt) : undefined,
+        audioFormat: (args.format as "mp3" | "wav") ?? "mp3"
+      });
+      return { text: `Music ${r.metadata.format}`, media: audioMedia(r.audioBase64, r.mimeType) };
+    }
+  },
+  {
+    name: "hands_gen_sfx",
+    description: "Generate sound effects (ElevenLabs, paid plan)",
+    inputSchema: {
+      text: { type: "string", required: true },
+      duration_seconds: { type: "number" },
+      loop: { type: "boolean" }
+    },
+    run: async (config, args) => {
+      const r = await generateElevenLabsSfx(config, {
+        text: String(args.text),
+        duration_seconds: args.duration_seconds ? Number(args.duration_seconds) : undefined,
+        loop: !!args.loop
+      });
+      return { text: "SFX generated", media: audioMedia(r.audioBase64, r.mimeType) };
+    }
+  },
+  {
+    name: "hands_gen_music_el",
+    description: "Generate music tracks (ElevenLabs Music, paid plan)",
+    inputSchema: {
+      prompt: { type: "string", required: true },
+      music_length_ms: { type: "number" },
+      force_instrumental: { type: "boolean" }
+    },
+    run: async (config, args) => {
+      const r = await generateElevenLabsMusic(config, {
+        prompt: String(args.prompt),
+        music_length_ms: args.music_length_ms ? Number(args.music_length_ms) : undefined,
+        force_instrumental: !!args.force_instrumental
+      });
+      return {
+        text: `ElevenLabs music ${r.metadata.duration_seconds}s`,
+        media: audioMedia(r.audioBase64, r.mimeType)
+      };
+    }
+  },
+  {
+    name: "hands_remove_bg",
+    description: "Remove background from an image (rmbg local AI)",
+    inputSchema: {
+      input: { type: "string", required: true },
+      quality: { type: "string", description: "fast | balanced | high" },
+      format: { type: "string", description: "png | jpeg" }
+    },
+    run: async (config, args) => {
+      const r = await removeBackground(config, {
+        inputImage: String(args.input),
+        quality: args.quality as "fast" | "balanced" | "high" | undefined,
+        outputFormat: args.format as "png" | "jpeg" | undefined,
+        backgroundColor: args.background ? String(args.background) : undefined
+      });
+      return {
+        text: `BG removed: ${r.originalDimensions.width}×${r.originalDimensions.height}, quality=${r.quality}`,
+        media: imageMedia(r.base64, r.mimeType)
+      };
+    }
+  },
+  {
+    name: "hands_screenshot_fullpage",
+    description: "Capture a full-page screenshot (Playwright)",
+    inputSchema: {
+      url: { type: "string", required: true },
+      format: { type: "string", description: "png | jpeg" },
+      viewport_width: { type: "number" },
+      viewport_height: { type: "number" }
+    },
+    run: async (_config, args) => {
+      const r = await captureFullPage({
+        url: String(args.url),
+        format: args.format as "png" | "jpeg" | undefined,
+        viewportWidth: args.viewport_width ? Number(args.viewport_width) : undefined,
+        viewportHeight: args.viewport_height ? Number(args.viewport_height) : undefined
+      });
+      return {
+        text: `Screenshot of ${r.url} (${r.viewport.width}×${r.viewport.height})`,
+        media: imageMedia(r.base64, r.mimeType)
+      };
+    }
+  },
+  {
+    name: "hands_screenshot_viewport",
+    description: "Capture visible viewport of a page (Playwright)",
+    inputSchema: {
+      url: { type: "string", required: true },
+      viewport_width: { type: "number" },
+      viewport_height: { type: "number" }
+    },
+    run: async (_config, args) => {
+      const r = await captureViewport({
+        url: String(args.url),
+        viewportWidth: args.viewport_width ? Number(args.viewport_width) : undefined,
+        viewportHeight: args.viewport_height ? Number(args.viewport_height) : undefined
+      });
+      return {
+        text: `Viewport of ${r.url}`,
+        media: imageMedia(r.base64, r.mimeType)
+      };
+    }
+  },
+  {
+    name: "hands_screenshot_element",
+    description: "Capture a specific element (Playwright)",
+    inputSchema: {
+      url: { type: "string", required: true },
+      selector: { type: "string", required: true },
+      selector_type: { type: "string", description: "css | text | role" }
+    },
+    run: async (_config, args) => {
+      const r = await captureElement({
+        url: String(args.url),
+        selector: String(args.selector),
+        selectorType: (args.selector_type as "css" | "text" | "role") ?? "css"
+      });
+      return {
+        text: `Element "${args.selector}" on ${r.url}`,
+        media: imageMedia(r.base64, r.mimeType)
+      };
+    }
+  },
+  {
+    name: "mouth_explain",
+    description: "Spoken explanation of code (Gemini + TTS)",
+    inputSchema: {
+      code: { type: "string", required: true },
+      programming_language: { type: "string" },
+      level: { type: "string", description: "beginner | intermediate | advanced" }
+    },
+    run: async (config, args) => {
+      const r = await explainCode(config, {
+        code: String(args.code),
+        programmingLanguage: args.programming_language
+          ? String(args.programming_language)
+          : undefined,
+        explanationLevel: args.level as "beginner" | "intermediate" | "advanced" | undefined
+      });
+      return { text: r.explanation, media: audioMedia(r.audioBase64, r.mimeType) };
+    }
+  },
+  {
+    name: "mouth_customize",
+    description: "Voice + style comparison (Gemini TTS)",
+    inputSchema: {
+      text: { type: "string", required: true },
+      voice: { type: "string" },
+      compare_voices: { type: "array" },
+      style_variations: { type: "array" }
+    },
+    run: async (config, args) => {
+      const arr = (v: unknown): string[] | undefined =>
+        Array.isArray(v) ? (v as string[]) : undefined;
+      const r = await customizeVoice(config, {
+        text: String(args.text),
+        voice: args.voice ? String(args.voice) : undefined,
+        compareVoices: arr(args.compare_voices),
+        styleVariations: arr(args.style_variations)
+      });
+      return {
+        text: `Generated ${r.totalVariants} variants`,
+        media: r.variants.map((v) => ({
+          kind: "audio" as const,
+          mimeType: v.mimeType,
+          base64: v.audioBase64
+        }))
       };
     }
   }
