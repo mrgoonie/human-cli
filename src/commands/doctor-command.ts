@@ -76,7 +76,9 @@ export function registerDoctorCommand(program: Command): void {
         }
       ]) {
         try {
-          await import(probe);
+          // Indirect to avoid TS resolving optional deps at typecheck time
+          const probePath: string = probe;
+          await import(probePath);
           lines.push(`  ${ok(`${label} — ${purpose}`)}`);
         } catch {
           lines.push(`  ${warn(`${label} missing — ${purpose}`)}`);

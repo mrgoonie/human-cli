@@ -14,9 +14,14 @@ import type { EnvRecord } from "../config/env-sources.js";
 export async function startMcpServer(env: EnvRecord): Promise<void> {
   let McpServer: unknown;
   let StdioServerTransport: unknown;
+  // Dynamic import names prevent TS from resolving the optional dep at typecheck time.
+  const mcpServerPath = "@modelcontextprotocol/sdk/server/mcp.js";
+  const stdioTransportPath = "@modelcontextprotocol/sdk/server/stdio.js";
   try {
-    ({ McpServer } = await import("@modelcontextprotocol/sdk/server/mcp.js"));
-    ({ StdioServerTransport } = await import("@modelcontextprotocol/sdk/server/stdio.js"));
+    ({ McpServer } = (await import(mcpServerPath)) as { McpServer: unknown });
+    ({ StdioServerTransport } = (await import(stdioTransportPath)) as {
+      StdioServerTransport: unknown;
+    });
   } catch {
     throw new MissingDependencyError(
       "@modelcontextprotocol/sdk",

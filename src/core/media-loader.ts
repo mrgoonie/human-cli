@@ -90,8 +90,10 @@ async function maybeCompressImage(
     return { data: buffer.toString("base64"), mimeType: mime };
   }
   try {
-    const { default: sharp } = (await import("sharp")) as { default: (b: Buffer) => SharpLike };
-    const processed = await sharp(buffer)
+    // Dynamic import name prevents TS from resolving the optional dep at typecheck time.
+    const pkgName = "sharp";
+    const mod = (await import(pkgName)) as { default: (b: Buffer) => SharpLike };
+    const processed = await mod.default(buffer)
       .resize(opts.maxImageDim, opts.maxImageDim, { fit: "inside", withoutEnlargement: true })
       .jpeg({ quality: opts.jpegQuality ?? 85 })
       .toBuffer();
