@@ -1,3 +1,9 @@
+## [2.1.0](https://github.com/mrgoonie/human-cli/compare/v2.0.0...v2.1.0) (2026-04-14)
+
+### Features
+
+* Phase 4 — port all heavy-media processors natively (v2.1) ([53dbcff](https://github.com/mrgoonie/human-cli/commit/53dbcff38ac150739671fa8a9520456b2d160a72))
+
 ## [2.0.0](https://github.com/mrgoonie/human-cli/compare/v1.1.0...v2.0.0) (2026-04-14)
 
 ### ⚠ BREAKING CHANGES
