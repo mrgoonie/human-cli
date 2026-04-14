@@ -1,6 +1,6 @@
 {
   "name": "@goonnguyen/human-cli",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Human-friendly & AI agent-friendly CLI for Human MCP — vision, speech, generation, reasoning in one terminal command",
   "type": "module",
   "bin": {

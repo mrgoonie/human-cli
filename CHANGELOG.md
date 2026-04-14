@@ -1,3 +1,9 @@
+## [2.1.1](https://github.com/mrgoonie/human-cli/compare/v2.1.0...v2.1.1) (2026-04-14)
+
+### Bug Fixes
+
+* decouple screenshot processor from optional playwright types ([429b00a](https://github.com/mrgoonie/human-cli/commit/429b00a300986dbfb538a088c1f10e6f8f1baf20))
+
 ## [2.1.0](https://github.com/mrgoonie/human-cli/compare/v2.0.0...v2.1.0) (2026-04-14)
 
 ### Features
