@@ -9,6 +9,7 @@ export default defineConfig({
   target: "node18",
   platform: "node",
   clean: true,
+  skipNodeModulesBundle: true,
   dts: {
     entry: { index: "src/index.ts" }
   },

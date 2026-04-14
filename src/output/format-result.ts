@@ -5,7 +5,14 @@
 import { writeFile, mkdir } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import pc from "picocolors";
-import type { ToolResult } from "../mcp/mcp-client.js";
+
+/** Shape this module expects from a tool invocation — text + media + ok flag. */
+export interface ToolResult {
+  ok: boolean;
+  text: string;
+  media: Array<{ kind: "image" | "audio" | "video" | "blob"; mimeType: string; base64: string }>;
+  raw?: unknown;
+}
 
 export interface RenderContext {
   tool: string;

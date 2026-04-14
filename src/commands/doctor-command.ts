@@ -1,16 +1,18 @@
 /**
- * "doctor" command — diagnose config + MCP server connectivity.
+ * Doctor — diagnostic: config, env, provider keys, available tools.
+ * Native implementation — no MCP subprocess handshake.
  */
 import type { Command } from "commander";
 import pc from "picocolors";
 import { resolveEnv } from "../config/resolve-env.js";
-import { HumanMcpClient, resolveHumanMcpEntry } from "../mcp/mcp-client.js";
+import { buildConfig } from "../core/build-config.js";
 import { extractGlobalFlags } from "../runtime/global-flags.js";
+import { TOOL_REGISTRY } from "../mcp/tool-registry.js";
 
 export function registerDoctorCommand(program: Command): void {
   program
     .command("doctor")
-    .description("Diagnostic: config, env, and MCP server connectivity")
+    .description("Diagnostic: config, env, provider credentials, and tool registry")
     .action(async (_opts, cmd) => {
       const globals = extractGlobalFlags(cmd);
       const { env, sources, configPath } = resolveEnv({
@@ -18,24 +20,34 @@ export function registerDoctorCommand(program: Command): void {
         configPath: globals.config,
         inlineFirst: globals.inlineFirst
       });
+      const color = !globals.noColor;
 
-      const ok = (msg: string) => (globals.noColor ? `[OK]   ${msg}` : `${pc.green("✓")}  ${msg}`);
-      const warn = (msg: string) => (globals.noColor ? `[WARN] ${msg}` : `${pc.yellow("!")}  ${msg}`);
-      const fail = (msg: string) => (globals.noColor ? `[FAIL] ${msg}` : `${pc.red("✗")}  ${msg}`);
+      const ok = (msg: string) => (color ? `${pc.green("✓")}  ${msg}` : `[OK]   ${msg}`);
+      const warn = (msg: string) => (color ? `${pc.yellow("!")}  ${msg}` : `[WARN] ${msg}`);
+      const fail = (msg: string) => (color ? `${pc.red("✗")}  ${msg}` : `[FAIL] ${msg}`);
 
-      const lines: string[] = [];
-      lines.push(pc.bold("\nhuman-cli doctor\n"));
-
-      lines.push(pc.dim("User config: ") + configPath);
-      lines.push(pc.dim("Node:        ") + process.version);
-      lines.push(pc.dim("Platform:    ") + `${process.platform}/${process.arch}`);
+      const lines: string[] = [color ? pc.bold("\nhuman-cli doctor\n") : "\nhuman-cli doctor\n"];
+      lines.push(`${color ? pc.dim("User config: ") : "User config: "}${configPath}`);
+      lines.push(`${color ? pc.dim("Node:        ") : "Node:        "}${process.version}`);
+      lines.push(`${color ? pc.dim("Platform:    ") : "Platform:    "}${process.platform}/${process.arch}`);
       lines.push("");
+
+      // Try building config (validates schema)
+      try {
+        buildConfig(env);
+        lines.push(ok("Config schema valid"));
+      } catch (err) {
+        lines.push(fail(`Config schema error: ${err instanceof Error ? err.message : err}`));
+      }
 
       // Gemini or Vertex
       if (env.GOOGLE_GEMINI_API_KEY) lines.push(ok("GOOGLE_GEMINI_API_KEY is set"));
-      else if (env.USE_VERTEX === "1" || env.USE_VERTEX === "true")
-        lines.push(ok("Vertex AI mode enabled"));
-      else lines.push(fail("No Gemini credentials (set GOOGLE_GEMINI_API_KEY or USE_VERTEX=1)"));
+      else if (env.USE_VERTEX === "1" || env.USE_VERTEX === "true") {
+        if (env.VERTEX_PROJECT_ID) lines.push(ok(`Vertex AI enabled (project: ${env.VERTEX_PROJECT_ID})`));
+        else lines.push(fail("USE_VERTEX=1 but VERTEX_PROJECT_ID missing"));
+      } else {
+        lines.push(fail("No Gemini credentials (set GOOGLE_GEMINI_API_KEY or USE_VERTEX=1 + VERTEX_PROJECT_ID)"));
+      }
 
       // Optional providers
       for (const [name, key] of [
@@ -43,39 +55,44 @@ export function registerDoctorCommand(program: Command): void {
         ["ZhipuAI", "ZHIPUAI_API_KEY"],
         ["ElevenLabs", "ELEVENLABS_API_KEY"]
       ] as const) {
-        lines.push(env[key] ? ok(`${name} configured`) : warn(`${name} not configured (optional)`));
+        lines.push(env[key] ? ok(`${name} configured`) : warn(`${name} not configured (optional, v2.1)`));
       }
-      lines.push("");
 
-      // Source summary
-      lines.push(pc.dim("Env sources:"));
+      // Optional native deps
+      lines.push("");
+      lines.push(color ? pc.dim("Optional deps:") : "Optional deps:");
+      for (const { label, probe, purpose } of [
+        { label: "sharp", probe: "sharp", purpose: "image compression" },
+        { label: "jimp", probe: "jimp", purpose: "local image ops (crop/resize/rotate/mask)" },
+        {
+          label: "@modelcontextprotocol/sdk",
+          probe: "@modelcontextprotocol/sdk/server/mcp.js",
+          purpose: "`human mcp start` — MCP server mode"
+        },
+        {
+          label: "@google-cloud/vertexai",
+          probe: "@google-cloud/vertexai",
+          purpose: "Vertex AI provider"
+        }
+      ]) {
+        try {
+          await import(probe);
+          lines.push(`  ${ok(`${label} — ${purpose}`)}`);
+        } catch {
+          lines.push(`  ${warn(`${label} missing — ${purpose}`)}`);
+        }
+      }
+
+      // Env source summary
+      lines.push("");
+      lines.push(color ? pc.dim("Env sources:") : "Env sources:");
       lines.push(
         `  os=${Object.keys(sources.os).length}  userConfig=${Object.keys(sources.userConfig).length}  processEnv=${Object.keys(sources.processEnv).length}  dotenv=${Object.keys(sources.dotenv).length}  inline=${Object.keys(sources.inline).length}`
       );
+
+      // Tool registry
       lines.push("");
-
-      // MCP server
-      const entry = resolveHumanMcpEntry();
-      lines.push(
-        entry ? ok(`human-mcp entry: ${entry}`) : fail("human-mcp not found (npm i @goonnguyen/human-mcp)")
-      );
-
-      if (entry) {
-        lines.push(pc.dim("\nAttempting MCP handshake..."));
-        try {
-          const client = new HumanMcpClient({
-            env,
-            timeoutMs: 15_000,
-            verbose: globals.verbose
-          });
-          await client.connect();
-          const tools = await client.listTools();
-          await client.close();
-          lines.push(ok(`MCP server connected — ${tools.length} tools available`));
-        } catch (err) {
-          lines.push(fail(`MCP handshake failed: ${err instanceof Error ? err.message : err}`));
-        }
-      }
+      lines.push(ok(`Native tool registry: ${TOOL_REGISTRY.length} tools available`));
 
       process.stdout.write(lines.join("\n") + "\n");
     });

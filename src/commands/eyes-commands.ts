@@ -1,10 +1,12 @@
 /**
  * "eyes" command group — vision & document analysis.
- * Maps to MCP tools: eyes_analyze, eyes_compare, eyes_read_document, eyes_summarize_document
+ * Native execution via processors in `src/processors/eyes/`.
  */
 import type { Command } from "commander";
-import { runTool } from "../runtime/run-tool.js";
+import { runProcessor } from "../runtime/run-processor.js";
 import { extractGlobalFlags } from "../runtime/global-flags.js";
+import { analyzeImage, compareImages } from "../processors/eyes/analyze-image.js";
+import { readDocument, summarizeDocument } from "../processors/eyes/read-document.js";
 
 export function registerEyesCommands(program: Command): void {
   const eyes = program
@@ -13,15 +15,15 @@ export function registerEyesCommands(program: Command): void {
 
   eyes
     .command("analyze <source>")
-    .description("Analyze an image, video, or GIF (file path, URL, data URI, or '-' for stdin)")
+    .description("Analyze an image (video/gif support via PDF/Gemini multimodal coming in v2.1)")
     .option("-f, --focus <text>", "What to focus on in the analysis")
     .option("-d, --detail <level>", "Analysis depth: quick | detailed", "detailed")
     .action(async (source: string, opts, cmd) => {
-      await runTool({
-        tool: "eyes_analyze",
-        args: { source, focus: opts.focus, detail: opts.detail },
-        sourceFields: ["source"],
-        globals: extractGlobalFlags(cmd)
+      await runProcessor({
+        tool: "eyes.analyze",
+        globals: extractGlobalFlags(cmd),
+        run: (config) => analyzeImage(config, source, { focus: opts.focus, detail: opts.detail }),
+        toOutput: (r) => ({ text: r.analysis })
       });
     });
 
@@ -30,26 +32,33 @@ export function registerEyesCommands(program: Command): void {
     .description("Compare two images")
     .option("-f, --focus <mode>", "differences | similarities | layout | content", "differences")
     .action(async (image1: string, image2: string, opts, cmd) => {
-      await runTool({
-        tool: "eyes_compare",
-        args: { image1, image2, focus: opts.focus },
-        sourceFields: ["image1", "image2"],
-        globals: extractGlobalFlags(cmd)
+      await runProcessor({
+        tool: "eyes.compare",
+        globals: extractGlobalFlags(cmd),
+        run: (config) => compareImages(config, image1, image2, opts.focus),
+        toOutput: (r) => ({ text: r.analysis })
       });
     });
 
   eyes
     .command("read <document>")
     .alias("read-document")
-    .description("Extract text/tables from a document (PDF, DOCX, XLSX, PPTX, …)")
+    .description("Extract text/tables from a document (PDF, txt, md, csv, json, html, xml)")
     .option("-p, --pages <range>", "Page range (e.g. '1-5' or 'all')", "all")
     .option("-x, --extract <mode>", "text | tables | both", "both")
     .action(async (document: string, opts, cmd) => {
-      await runTool({
-        tool: "eyes_read_document",
-        args: { document, pages: opts.pages, extract: opts.extract },
-        sourceFields: ["document"],
-        globals: extractGlobalFlags(cmd)
+      await runProcessor({
+        tool: "eyes.read",
+        globals: extractGlobalFlags(cmd),
+        run: (config) => readDocument(config, document, { pages: opts.pages, extract: opts.extract }),
+        toOutput: (r) => ({
+          text: [
+            r.text,
+            r.tables.length > 0 ? `\n## Tables\n${JSON.stringify(r.tables, null, 2)}` : ""
+          ]
+            .filter(Boolean)
+            .join("\n")
+        })
       });
     });
 
@@ -60,11 +69,12 @@ export function registerEyesCommands(program: Command): void {
     .option("-l, --length <size>", "brief | medium | detailed", "medium")
     .option("-f, --focus <text>", "Specific topics to focus on")
     .action(async (document: string, opts, cmd) => {
-      await runTool({
-        tool: "eyes_summarize_document",
-        args: { document, length: opts.length, focus: opts.focus },
-        sourceFields: ["document"],
-        globals: extractGlobalFlags(cmd)
+      await runProcessor({
+        tool: "eyes.summarize",
+        globals: extractGlobalFlags(cmd),
+        run: (config) =>
+          summarizeDocument(config, document, { length: opts.length, focus: opts.focus }),
+        toOutput: (r) => ({ text: r.summary })
       });
     });
 }

@@ -1,50 +1,41 @@
 /**
- * "mcp" command — launch the underlying human-mcp server directly,
- * using the resolved env from human-cli's config chain.
- * Ideal for Claude Desktop / MCP clients that expect a stdio server.
+ * "mcp" command — launches human-cli as a native MCP stdio server,
+ * exposing our tool registry to Claude Desktop and other MCP clients.
+ *
+ * No subprocess / no dependency on @goonnguyen/human-mcp — we ARE the server.
  */
 import type { Command } from "commander";
-import { spawn } from "node:child_process";
 import { resolveEnv } from "../config/resolve-env.js";
-import { resolveHumanMcpEntry } from "../mcp/mcp-client.js";
 import { extractGlobalFlags } from "../runtime/global-flags.js";
+import { startMcpServer } from "../mcp/server.js";
+import { logger } from "../core/logger.js";
 
 export function registerMcpCommand(program: Command): void {
   const mcp = program
     .command("mcp")
-    .description("Launch the underlying human-mcp server (for Claude Desktop etc.)");
+    .description("MCP server mode — expose native tools to Claude Desktop et al.");
 
   mcp
     .command("start", { isDefault: true })
-    .description("Start human-mcp with resolved env (stdio by default)")
-    .option("--transport <t>", "stdio | http | both", "stdio")
-    .option("--http-port <n>", "HTTP port when transport=http|both", Number)
-    .action(async (opts, cmd) => {
+    .description("Start human-cli as a stdio MCP server")
+    .action(async (_opts, cmd) => {
       const globals = extractGlobalFlags(cmd);
       const { env } = resolveEnv({
         inlineEnv: globals.env,
         configPath: globals.config,
         inlineFirst: globals.inlineFirst
       });
-      env.TRANSPORT_TYPE = opts.transport ?? "stdio";
-      if (opts.httpPort) env.HTTP_PORT = String(opts.httpPort);
+      if (globals.apiKey) env.GOOGLE_GEMINI_API_KEY = globals.apiKey;
+      if (globals.model) env.GOOGLE_GEMINI_MODEL = globals.model;
+      if (globals.verbose) env.LOG_LEVEL = "debug";
+      logger.setLevel((env.LOG_LEVEL as "debug" | "info" | "warn" | "error") || "info");
 
-      const entry = globals.mcpBin ?? resolveHumanMcpEntry();
-      if (!entry) {
-        process.stderr.write(
-          "human-mcp not found. Install it with: npm i @goonnguyen/human-mcp\n"
-        );
+      try {
+        await startMcpServer(env);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        process.stderr.write(`Failed to start MCP server: ${message}\n`);
         process.exit(4);
       }
-
-      const child = spawn(process.execPath, [entry], {
-        stdio: "inherit",
-        env: { ...process.env, ...env }
-      });
-      child.on("exit", (code) => process.exit(code ?? 0));
-      child.on("error", (err) => {
-        process.stderr.write(`Failed to start human-mcp: ${err.message}\n`);
-        process.exit(4);
-      });
     });
 }

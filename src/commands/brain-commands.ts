@@ -1,41 +1,54 @@
 /**
- * "brain" command group — reasoning & reflection.
+ * "brain" command group — native reasoning & reflection.
  */
 import type { Command } from "commander";
-import { runTool } from "../runtime/run-tool.js";
-import { extractGlobalFlags } from "../runtime/global-flags.js";
 import { readFileSync, existsSync } from "node:fs";
+import { runProcessor } from "../runtime/run-processor.js";
+import { extractGlobalFlags } from "../runtime/global-flags.js";
+import {
+  think,
+  reflect,
+  analyzeSimple,
+  patternsInfo
+} from "../processors/brain/think.js";
 
 export function registerBrainCommands(program: Command): void {
   const brain = program.command("brain").description("Reasoning, reflection, and pattern analysis");
 
   brain
     .command("think <problem>")
-    .description("Step-by-step sequential thinking")
+    .description("Step-by-step sequential thinking (Gemini)")
     .option("--max-thoughts <n>", "Maximum thoughts", Number, 10)
     .action(async (problem: string, opts, cmd) => {
-      await runTool({
-        tool: "mcp__reasoning__sequentialthinking",
-        args: { problem: materializeText(problem), thought_limit: opts.maxThoughts },
-        globals: extractGlobalFlags(cmd)
+      await runProcessor({
+        tool: "brain.think",
+        globals: extractGlobalFlags(cmd),
+        run: (config) => think(config, { problem: materializeText(problem), maxThoughts: opts.maxThoughts }),
+        toOutput: (r) => ({
+          text:
+            r.thoughts
+              .map((t) => `### ${t.step}. ${t.thought}\n_confidence: ${(t.confidence * 100).toFixed(0)}%_`)
+              .join("\n\n") + `\n\n---\n\n## Conclusion\n\n${r.conclusion}`
+        })
       });
     });
 
   brain
     .command("analyze <input>")
-    .description("Pattern-based lightweight reasoning")
-    .option("--type <t>", "Analysis type (e.g. logical, root-cause, tradeoff)")
+    .description("Pattern-based local analysis (no API call)")
+    .option("--type <t>", "general | logical | root-cause | tradeoff", "general")
     .action(async (input: string, opts, cmd) => {
-      await runTool({
-        tool: "brain_analyze_simple",
-        args: { input: materializeText(input), analysis_type: opts.type },
-        globals: extractGlobalFlags(cmd)
+      await runProcessor({
+        tool: "brain.analyze",
+        globals: extractGlobalFlags(cmd),
+        run: async () => analyzeSimple({ input: materializeText(input), analysisType: opts.type }),
+        toOutput: (r) => ({ text: r.analysis })
       });
     });
 
   brain
     .command("reflect <analysis>")
-    .description("AI-powered reflection to improve an analysis")
+    .description("AI reflection to improve a prior analysis (Gemini)")
     .option(
       "--focus <areas>",
       "Comma list: assumptions, logic_gaps, alternative_approaches, evidence_quality, bias_detection, completeness",
@@ -44,30 +57,37 @@ export function registerBrainCommands(program: Command): void {
     .option("--goal <text>", "Primary improvement goal")
     .option("--detail <lvl>", "concise | detailed", "detailed")
     .action(async (analysis: string, opts, cmd) => {
-      await runTool({
-        tool: "brain_reflect_enhanced",
-        args: {
-          originalAnalysis: materializeText(analysis),
-          focusAreas: String(opts.focus)
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean),
-          improvementGoal: opts.goal,
-          detailLevel: opts.detail
-        },
-        globals: extractGlobalFlags(cmd)
+      await runProcessor({
+        tool: "brain.reflect",
+        globals: extractGlobalFlags(cmd),
+        run: (config) =>
+          reflect(config, {
+            analysis: materializeText(analysis),
+            focusAreas: String(opts.focus)
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean) as ("assumptions" | "logic_gaps")[],
+            improvementGoal: opts.goal,
+            detailLevel: opts.detail
+          }),
+        toOutput: (r) => ({ text: r.reflection })
       });
     });
 
   brain
     .command("patterns")
-    .description("List available reasoning patterns / frameworks")
+    .description("List reasoning patterns / frameworks (local)")
     .option("-q, --query <text>", "Filter by keyword")
     .action(async (opts, cmd) => {
-      await runTool({
-        tool: "brain_patterns_info",
-        args: { query: opts.query },
-        globals: extractGlobalFlags(cmd)
+      await runProcessor({
+        tool: "brain.patterns",
+        globals: extractGlobalFlags(cmd),
+        run: async () => patternsInfo(opts.query),
+        toOutput: (r) => ({
+          text:
+            "# Reasoning Patterns\n\n" +
+            r.patterns.map((p) => `- **${p.name}** — ${p.purpose}`).join("\n")
+        })
       });
     });
 }
