@@ -1,0 +1,89 @@
+{
+  "name": "human-cli",
+  "version": "0.0.0-dev",
+  "description": "Human-friendly & AI agent-friendly CLI for Human MCP — vision, speech, generation, reasoning in one terminal command",
+  "type": "module",
+  "bin": {
+    "human": "dist/cli.js",
+    "human-cli": "dist/cli.js"
+  },
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "AGENT.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "prepack": "npm run build",
+    "cli": "node dist/cli.js"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.7.0",
+    "@goonnguyen/human-mcp": "^2.14.0",
+    "@modelcontextprotocol/sdk": "^1.4.0",
+    "commander": "^12.1.0",
+    "dotenv": "^16.4.5",
+    "ora": "^8.1.0",
+    "picocolors": "^1.1.0"
+  },
+  "devDependencies": {
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/commit-analyzer": "^13.0.0",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^11.0.0",
+    "@semantic-release/npm": "^12.0.1",
+    "@semantic-release/release-notes-generator": "^14.0.0",
+    "conventional-changelog-conventionalcommits": "^8.0.0",
+    "@types/node": "^20.14.0",
+    "prettier": "^3.3.3",
+    "semantic-release": "^24.1.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "cli",
+    "mcp",
+    "ai",
+    "agent",
+    "gemini",
+    "vision",
+    "tts",
+    "image-generation",
+    "video-generation",
+    "human-mcp",
+    "claude",
+    "agent-cli"
+  ],
+  "homepage": "https://github.com/mrgoonie/human-cli#readme",
+  "bugs": {
+    "url": "https://github.com/mrgoonie/human-cli/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mrgoonie/human-cli.git"
+  },
+  "author": "Duy Nguyen <duy@wearetopgroup.com> (https://github.com/mrgoonie)",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  }
+}
