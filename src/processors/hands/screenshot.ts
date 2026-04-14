@@ -34,13 +34,39 @@ export interface ScreenshotResult {
 type Mode = "fullpage" | "viewport" | "element";
 
 /**
- * Dynamic playwright loader — lazy import to avoid bundling 200MB of chromium
- * for users who never run screenshot commands.
+ * Minimal structural types so TypeScript doesn't try to resolve the optional
+ * `playwright` module at typecheck time. The real shapes are richer, but the
+ * subset below is all this processor uses.
  */
-async function requirePlaywright(): Promise<typeof import("playwright")> {
+interface PwLocator {
+  waitFor: (opts: { state?: string; timeout?: number }) => Promise<void>;
+  boundingBox: () => Promise<{ x: number; y: number; width: number; height: number } | null>;
+  screenshot: (opts: Record<string, unknown>) => Promise<Buffer>;
+}
+interface PwPage {
+  setDefaultTimeout: (ms: number) => void;
+  goto: (url: string, opts?: { waitUntil?: string }) => Promise<unknown>;
+  screenshot: (opts: Record<string, unknown>) => Promise<Buffer>;
+  getByText: (selector: string) => PwLocator;
+  getByRole: (role: string) => PwLocator;
+  locator: (selector: string) => PwLocator;
+}
+interface PwBrowser {
+  newContext: (opts: { viewport?: { width: number; height: number } }) => Promise<{
+    newPage: () => Promise<PwPage>;
+  }>;
+  close: () => Promise<void>;
+}
+interface PwModule {
+  chromium: {
+    launch: (opts: { headless?: boolean; timeout?: number }) => Promise<PwBrowser>;
+  };
+}
+
+async function requirePlaywright(): Promise<PwModule> {
   const pkgName = "playwright";
   try {
-    return (await import(pkgName)) as typeof import("playwright");
+    return (await import(pkgName)) as unknown as PwModule;
   } catch {
     throw new MissingDependencyError(
       "playwright",
@@ -110,15 +136,12 @@ async function captureScreenshot(
 }
 
 function buildLocator(
-  page: import("playwright").Page,
+  page: PwPage,
   selector: string,
   selectorType: "css" | "text" | "role"
-): import("playwright").Locator {
+): PwLocator {
   if (selectorType === "text") return page.getByText(selector);
-  if (selectorType === "role") {
-    // assume user passed a role name (e.g. "button")
-    return page.getByRole(selector as Parameters<typeof page.getByRole>[0]);
-  }
+  if (selectorType === "role") return page.getByRole(selector);
   return page.locator(selector);
 }
 
