@@ -1,3 +1,9 @@
+## [2.3.0](https://github.com/mrgoonie/human-cli/compare/v2.2.0...v2.3.0) (2026-04-15)
+
+### Features
+
+* **skills:** restructure human skill as Claude Code plugin marketplace ([5b08565](https://github.com/mrgoonie/human-cli/commit/5b085654b30bf05c870fd3debd9cc2d4fe16959d))
+
 ## [2.2.0](https://github.com/mrgoonie/human-cli/compare/v2.1.1...v2.2.0) (2026-04-15)
 
 ### Features
