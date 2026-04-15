@@ -1,3 +1,9 @@
+## [2.2.0](https://github.com/mrgoonie/human-cli/compare/v2.1.1...v2.2.0) (2026-04-15)
+
+### Features
+
+* **skills:** add human-cli agent skill pack for AI agents ([dc7efe5](https://github.com/mrgoonie/human-cli/commit/dc7efe549ab4584c8694403ffb5749234e6869e7))
+
 ## [2.1.1](https://github.com/mrgoonie/human-cli/compare/v2.1.0...v2.1.1) (2026-04-14)
 
 ### Bug Fixes
