@@ -221,17 +221,21 @@ human-cli ships its own native MCP server (`human mcp start`). Requires the `@mo
 
 ## Use with AI Agents (Claude Code, Claude Cowork, Antigravity, …)
 
-This repo ships a reusable **Agent Skill** at [`.claude/skills/human/`](./.claude/skills/human/SKILL.md) that teaches any skill-aware agent how to drive `human-cli` correctly: when to pick which command, how to parse the JSON envelope, how to isolate outputs per session, and how to recover from the 4 classes of exit errors.
+This repo ships a reusable **Agent Skill** at [`plugins/human/skills/human/`](./plugins/human/skills/human/SKILL.md) that teaches any skill-aware agent how to drive `human-cli` correctly: when to pick which command, how to parse the JSON envelope, how to isolate outputs per session, and how to recover from the 4 classes of exit errors.
 
-### Claude Code
+The skill is packaged as a **Claude Code plugin marketplace** (see [`.claude-plugin/marketplace.json`](./.claude-plugin/marketplace.json)) so it can be installed with a single command.
 
-Claude Code auto-discovers skills in `<project>/.claude/skills/` when it runs inside the repo, no install step needed. To make the skill available **globally** across every project:
+### Claude Code — install as a plugin (recommended)
 
 ```bash
-# Copy (or symlink) the skill into your user skills dir
-cp -R ./.claude/skills/human ~/.claude/skills/
-# or: ln -s "$(pwd)/.claude/skills/human" ~/.claude/skills/human
+# Add this repo as a marketplace, then install the "human" plugin
+/plugin marketplace add mrgoonie/human-cli
+/plugin install human@human-cli
 ```
+
+From then on, **every** Claude Code session has the skill loaded globally, independent of CWD.
+
+**Alternative — project-local auto-discovery:** Claude Code also auto-loads skills from `<project>/.claude/skills/` when running inside this repo (the directory symlinks into `plugins/human/skills/human`). No install step needed, but only active while CWD is inside the repo.
 
 Then just talk to the agent in natural language — *"look at ./mock.png and tell me what's off"*, *"generate a 16:9 hero image of …"*, *"narrate ./post.md to mp3"* — the `human` skill auto-activates via its description triggers.
 
@@ -239,14 +243,14 @@ Then just talk to the agent in natural language — *"look at ./mock.png and tel
 
 Cowork teammates have shell access. Either:
 
-- **Shell route** — install globally (`npm i -g @goonnguyen/human-cli`), then copy this repo's `.claude/skills/human/` into the Cowork project so all teammates share the same command map + workflow.
+- **Plugin route** — have every teammate run `/plugin marketplace add mrgoonie/human-cli && /plugin install human@human-cli`.
 - **MCP route** — register `human mcp start` as an MCP server in the Cowork config so tools appear natively without shelling out.
 
 Set `GOOGLE_GEMINI_API_KEY` in the team config (or via `human config set`) so every teammate resolves the same key.
 
 ### Google Antigravity
 
-Antigravity agents can execute shell commands. Install the CLI (`npm i -g @goonnguyen/human-cli`) and point the agent at [`AGENT.md`](./AGENT.md) + [`.claude/skills/human/SKILL.md`](./.claude/skills/human/SKILL.md) as reference docs. The `--json` envelope, stable exit codes, and `human tools --json` discovery endpoint make it straightforward for an Antigravity agent to plan → invoke → verify each step.
+Antigravity agents can execute shell commands. Install the CLI (`npm i -g @goonnguyen/human-cli`) and point the agent at [`AGENT.md`](./AGENT.md) + [`plugins/human/skills/human/SKILL.md`](./plugins/human/skills/human/SKILL.md) as reference docs. The `--json` envelope, stable exit codes, and `human tools --json` discovery endpoint make it straightforward for an Antigravity agent to plan → invoke → verify each step.
 
 ### Any other agent framework
 
@@ -255,7 +259,7 @@ If your agent can run shell commands and parse JSON, it can use `human-cli`. Poi
 1. `human tools --json` — discover the 26 tool names + schemas at runtime
 2. `human call <tool> --args '<json>' --json` — generic invoke path
 3. [`AGENT.md`](./AGENT.md) — integration contract (envelope, exit codes, piping patterns)
-4. [`.claude/skills/human/`](./.claude/skills/human/) — full skill pack (workflows, recipes, troubleshooting)
+4. [`plugins/human/skills/human/`](./plugins/human/skills/human/) — full skill pack (workflows, recipes, troubleshooting)
 
 ## What's new in v2.1
 

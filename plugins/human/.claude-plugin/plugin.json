@@ -1,0 +1,23 @@
+{
+  "name": "human",
+  "version": "1.0.0",
+  "description": "Agent skill for human-cli — vision, image gen, speech, reasoning from the terminal (eyes/hands/mouth/brain, 26 tools, JSON envelopes, MCP-compatible)",
+  "author": {
+    "name": "Duy Nguyen",
+    "email": "duy@wearetopgroup.com"
+  },
+  "homepage": "https://github.com/mrgoonie/human-cli",
+  "repository": "https://github.com/mrgoonie/human-cli",
+  "license": "MIT",
+  "keywords": [
+    "cli",
+    "ai-agent",
+    "gemini",
+    "vision",
+    "image-generation",
+    "tts",
+    "reasoning",
+    "mcp",
+    "agent-skill"
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "name": "human-cli",
+  "owner": {
+    "name": "Duy Nguyen",
+    "email": "duy@wearetopgroup.com"
+  },
+  "metadata": {
+    "description": "Agent skill pack for human-cli — teaches Claude Code and other skill-aware agents how to drive human-cli (vision, image gen, speech, reasoning)",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "human",
+      "source": "./plugins/human",
+      "description": "Teaches AI agents to use human-cli: the 26-tool terminal-native CLI for vision, image generation, speech synthesis, and structured reasoning (eyes/hands/mouth/brain). Triggers on image analysis, PDF summarization, image generation and editing, text-to-speech, narration, reasoning frameworks, and reflection.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Duy Nguyen",
+        "email": "duy@wearetopgroup.com"
+      },
+      "homepage": "https://github.com/mrgoonie/human-cli#use-with-ai-agents-claude-code-claude-cowork-antigravity",
+      "repository": "https://github.com/mrgoonie/human-cli",
+      "license": "MIT",
+      "keywords": [
+        "cli",
+        "ai-agent",
+        "gemini",
+        "vision",
+        "image-generation",
+        "tts",
+        "text-to-speech",
+        "reasoning",
+        "mcp",
+        "claude",
+        "agent-skill"
+      ],
+      "category": "ai-agents",
+      "tags": [
+        "vision",
+        "image",
+        "speech",
+        "reasoning",
+        "multimodal",
+        "gemini",
+        "minimax",
+        "elevenlabs"
+      ]
+    }
+  ]
+}
