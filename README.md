@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/mrgoonie/human-cli/main/human-cli.jpeg" alt="human-cli — vision, hands, mouth, brain for your terminal" width="720">
+</p>
+
 # human-cli
 
 > **Human-friendly & AI agent-friendly CLI** bringing vision, speech, image generation, and reasoning to your terminal — powered by Gemini.
@@ -214,6 +218,44 @@ cat payload.json | human call mouth_speak --args - --json -o -
 ```
 
 human-cli ships its own native MCP server (`human mcp start`). Requires the `@modelcontextprotocol/sdk` optional dep (auto-installed).
+
+## Use with AI Agents (Claude Code, Claude Cowork, Antigravity, …)
+
+This repo ships a reusable **Agent Skill** at [`.claude/skills/human/`](./.claude/skills/human/SKILL.md) that teaches any skill-aware agent how to drive `human-cli` correctly: when to pick which command, how to parse the JSON envelope, how to isolate outputs per session, and how to recover from the 4 classes of exit errors.
+
+### Claude Code
+
+Claude Code auto-discovers skills in `<project>/.claude/skills/` when it runs inside the repo, no install step needed. To make the skill available **globally** across every project:
+
+```bash
+# Copy (or symlink) the skill into your user skills dir
+cp -R ./.claude/skills/human ~/.claude/skills/
+# or: ln -s "$(pwd)/.claude/skills/human" ~/.claude/skills/human
+```
+
+Then just talk to the agent in natural language — *"look at ./mock.png and tell me what's off"*, *"generate a 16:9 hero image of …"*, *"narrate ./post.md to mp3"* — the `human` skill auto-activates via its description triggers.
+
+### Claude Cowork
+
+Cowork teammates have shell access. Either:
+
+- **Shell route** — install globally (`npm i -g @goonnguyen/human-cli`), then copy this repo's `.claude/skills/human/` into the Cowork project so all teammates share the same command map + workflow.
+- **MCP route** — register `human mcp start` as an MCP server in the Cowork config so tools appear natively without shelling out.
+
+Set `GOOGLE_GEMINI_API_KEY` in the team config (or via `human config set`) so every teammate resolves the same key.
+
+### Google Antigravity
+
+Antigravity agents can execute shell commands. Install the CLI (`npm i -g @goonnguyen/human-cli`) and point the agent at [`AGENT.md`](./AGENT.md) + [`.claude/skills/human/SKILL.md`](./.claude/skills/human/SKILL.md) as reference docs. The `--json` envelope, stable exit codes, and `human tools --json` discovery endpoint make it straightforward for an Antigravity agent to plan → invoke → verify each step.
+
+### Any other agent framework
+
+If your agent can run shell commands and parse JSON, it can use `human-cli`. Point it at:
+
+1. `human tools --json` — discover the 26 tool names + schemas at runtime
+2. `human call <tool> --args '<json>' --json` — generic invoke path
+3. [`AGENT.md`](./AGENT.md) — integration contract (envelope, exit codes, piping patterns)
+4. [`.claude/skills/human/`](./.claude/skills/human/) — full skill pack (workflows, recipes, troubleshooting)
 
 ## What's new in v2.1
 
